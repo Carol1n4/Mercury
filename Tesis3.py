@@ -1,4 +1,3 @@
-
 from flask import Flask, request, redirect, url_for, render_template, send_file, flash
 import os
 import tempfile
@@ -11,7 +10,6 @@ from docx.oxml import OxmlElement
 from flask_sqlalchemy import SQLAlchemy
 from docx2pdf import convert  # Para convertir el archivo .docx a .pdf
 import pythoncom
-
 
 
 app = Flask(__name__)
@@ -91,7 +89,6 @@ def login():
 def upload_file():
     return render_template('upload.html')
 
-@app.route('/upload', methods=['POST', 'GET'])
 
 @app.route('/upload', methods=['POST', 'GET'])
 def upload():
@@ -102,17 +99,15 @@ def upload():
         return 'No selected file'
     
     if file:
-        # Verificar la extensión del archivo y manejar según corresponda
-        if file.filename.endswith('.pdf'):
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-                ruta_archivo = temp_file.name
-                file.save(ruta_archivo)
-        elif file.filename.endswith('.docx'):
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_file:
-                ruta_archivo = temp_file.name
-                file.save(ruta_archivo)
-        else:
-            return 'Formato de archivo no soportado', 400
+        # Obtener el nombre del archivo original y la extensión
+        nombre_original, extension = os.path.splitext(file.filename)
+
+        # Agregar el sufijo "_adaptado" al nombre original
+        nombre_adaptado = nombre_original + extension
+
+        # Guardar el archivo con el nuevo nombre
+        ruta_archivo = os.path.join(tempfile.gettempdir(), nombre_adaptado)
+        file.save(ruta_archivo)
 
         # Obtener los parámetros de adaptación
         nombre_fuente = request.form.get('nombre_fuente')
@@ -133,9 +128,11 @@ def upload():
 
         # Verificar si el archivo modificado existe antes de devolverlo
         if os.path.exists(nombre_archivo_modificado):
+            # Asegurarse de que el archivo que se devuelve mantenga el sufijo _adaptado
             return send_file(nombre_archivo_modificado, as_attachment=True)
         else:
             return 'El archivo adaptado no se encontró', 404
+
 
 
 def convertir_pdf_a_docx(ruta_pdf, ruta_docx):
@@ -143,38 +140,6 @@ def convertir_pdf_a_docx(ruta_pdf, ruta_docx):
     cv.convert(ruta_docx, start=0, end=None)
     cv.close()
 
-# def modificar_pdf(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo):
-#     doc = fitz.open(ruta_archivo)
-#     nuevo_doc = fitz.open()
-
-#     ancho_a4 = 595
-#     alto_a4 = 842
-#     margen_superior = 50
-#     margen_inferior = 50
-#     margen_izquierdo = 50
-#     margen_derecho = 50
-
-#     color_fondo_rgb = tuple(int(color_fondo[i:i+2], 16) / 255 for i in (1, 3, 5))
-
-#     for pagina in doc:
-#         nueva_pagina = nuevo_doc.new_page(width=ancho_a4, height=alto_a4)
-#         nueva_pagina.draw_rect(fitz.Rect(0, 0, ancho_a4, alto_a4), color=color_fondo_rgb, fill=color_fondo_rgb)
-
-#         y_offset = margen_superior
-#         for bloque in pagina.get_text("dict")["blocks"]:
-#             if "lines" in bloque:
-#                 for linea in bloque["lines"]:
-#                     for span in linea["spans"]:
-#                         texto = span["text"]
-#                         x, y = span["bbox"][:2]
-#                         nueva_pagina.insert_text((x, y_offset), texto, fontname=nombre_fuente, fontsize=size_fuente, color=(0, 0, 0))
-#                     y_offset += size_fuente * 1.8
-#                 y_offset += size_fuente * 0.5
-
-#     nombre_archivo_modificado = os.path.splitext(ruta_archivo)[0] + "_adaptado.pdf"
-#     nuevo_doc.save(nombre_archivo_modificado)
-#     nuevo_doc.close()
-#     return nombre_archivo_modificado
 
 def modificar_pdf(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo):
     doc = fitz.open(ruta_archivo)
@@ -211,27 +176,6 @@ def modificar_pdf(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_
     return nombre_archivo_modificado
 
 
-# def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo):
-#     pythoncom.CoInitialize()  # Inicializa el sistema COM
-#     try:
-#         doc = Document(ruta_archivo)
-#         for parrafo in doc.paragraphs:
-#             for run in parrafo.runs:
-#                 run.font.name = nombre_fuente
-#                 run.font.size = Pt(size_fuente)
-
-#             p = parrafo._element
-#             pPr = p.get_or_add_pPr()
-#             spacing = OxmlElement('w:spacing')
-#             spacing.set(qn('w:line'), str(int((interlineado + 2) * 1.8 * 20)))
-#             pPr.append(spacing)
-
-#         nombre_archivo_modificado = os.path.splitext(ruta_archivo)[0] + "_adaptado.docx"
-#         doc.save(nombre_archivo_modificado)
-#         return nombre_archivo_modificado
-#     finally:
-#         pythoncom.CoUninitialize()  # Desinicializa COM
-
 def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo):
     pythoncom.CoInitialize()  # Inicializa el sistema COM
     try:
@@ -265,22 +209,24 @@ def modificar_documento(ruta_archivo, nombre_fuente, size_fuente, interlineado, 
     pythoncom.CoInitialize()  # Inicializa el sistema COM
     try:
         if formato_salida == "pdf":
-            ruta_docx_temp = os.path.splitext(ruta_archivo)[0] + "_temp.docx"
+            # No se añade sufijo extra aquí
+            ruta_docx_temp = os.path.splitext(ruta_archivo)[0] + ".docx"
             convertir_pdf_a_docx(ruta_archivo, ruta_docx_temp)
             archivo_docx = modificar_word(ruta_docx_temp, nombre_fuente, interlineado, size_fuente, color_fondo)
 
             # Convertir el archivo Word a PDF
-            archivo_pdf_final = os.path.splitext(archivo_docx)[0] + ".pdf"
+            archivo_pdf_final = os.path.splitext(ruta_archivo)[0] + "_adaptado.pdf"  # Sufijo solo aquí
             convert(archivo_docx, archivo_pdf_final)
 
             return archivo_pdf_final
 
         elif formato_salida == "docx":
             if ruta_archivo.endswith('.pdf'):
-                ruta_docx_temp = os.path.splitext(ruta_archivo)[0] + "_temp.docx"
+                ruta_docx_temp = os.path.splitext(ruta_archivo)[0] + ".docx"
                 convertir_pdf_a_docx(ruta_archivo, ruta_docx_temp)
                 return modificar_word(ruta_docx_temp, nombre_fuente, interlineado, size_fuente, color_fondo)
             else:
+                # Sufijo _adaptado solo aquí
                 return modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo)
     finally:
         pythoncom.CoUninitialize()  # Desinicializa COM
