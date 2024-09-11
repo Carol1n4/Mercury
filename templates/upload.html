@@ -8,7 +8,7 @@
         body {
             font-family: Arial, sans-serif;
             /* background-color: #f4f4f4; */
-            background-image: url('../imagenes/fondo.png');
+            background-image: url("{{ url_for('static', filename='imagenes/fondo.png') }}");
             background-size: cover;
             background-position: center;
             display: flex;
@@ -208,7 +208,7 @@
                 <input type="submit" value="Subir y Adaptar">
             </div>
             <div class="logo-container"></div>
-                <img src="../imagenes/mercury_logo.png" alt="Logo Mercury">
+                <img src="{{ url_for('static', filename='imagenes/mercury_logo.png') }}" alt="Logo Mercury">
             </div>
 
 
