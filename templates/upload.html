@@ -7,30 +7,43 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            /* background-color: #f4f4f4; */
+            background-image: url('../imagenes/fondo.png');
+            background-size: cover;
+            background-position: center;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
+            overflow: visible; 
         }
 
         .container {
+        
             background-color: #ffffff;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             padding: 20px;
             max-width: 500px;
             width: 100%;
-        }
+            overflow: visible; 
+            height: auto; /* Asegúrate de que el contenedor se ajuste al contenido */
+            overflow: visible; /* Asegúrate de que no haya recortes de contenido */
+            }
 
         h1 {
+            margin-top: 230px; /*  Ajusta según sea necesario  */
+            /* padding: 10px 0; */
+            position: relative;
+            z-index: 15;
             text-align: center;
             color: #333;
+
         }
 
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 25px;
         }
 
         .form-group label {
@@ -43,17 +56,17 @@
         .form-group input[type="text"],
         .form-group input[type="number"],
         .form-group select {
-            width: 100%;
+            width: 99%;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
         }
 
         .form-group input[type="submit"] {
-            background-color: #007bff;
+            background-color: #60909A;
             color: #fff;
             border: none;
-            padding: 10px;
+            padding: 15px;
             border-radius: 4px;
             cursor: pointer;
             width: 100%;
@@ -61,7 +74,7 @@
         }
 
         .form-group input[type="submit"]:hover {
-            background-color: #0056b3;
+            background-color: #10223D;
         }
 
         .color-options {
@@ -90,7 +103,7 @@
         }
 
         .color-option input[type="radio"]:checked + label {
-            border: 2px solid #007bff;
+            border: 2px solid #10223D;
         }
 
         .color-option .color-bg {
@@ -104,6 +117,23 @@
         .color-bg-lightblue { background-color: #d0e6f4; }
         .color-bg-lightyellow { background-color: #ffffcc; }
         .color-bg-lightgreen { background-color: #d4f4d0; }
+
+        .logo-container {
+    display: flex;
+    justify-content: center; /* Centra horizontalmente */
+    align-items: center;     /* Centra verticalmente */
+    margin-top: 20px;
+    text-align: center;
+    
+}
+
+.logo-container img {
+    width: 1000px; /* Ajusta el ancho según lo necesites */
+    height: auto;
+    object-fit: contain; /* Asegura que la imagen no se deforme */
+}
+
+
     </style>
 </head>
 <body>
@@ -177,6 +207,11 @@
             <div class="form-group">
                 <input type="submit" value="Subir y Adaptar">
             </div>
+            <div class="logo-container"></div>
+                <img src="../imagenes/mercury_logo.png" alt="Logo Mercury">
+            </div>
+
+
         </form>
     </div>
 </body>
