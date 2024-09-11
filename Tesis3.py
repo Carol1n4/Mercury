@@ -148,9 +148,6 @@ def modificar_pdf(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_
     ancho_a4 = 595
     alto_a4 = 842
     margen_superior = 50
-    margen_inferior = 50
-    margen_izquierdo = 50
-    margen_derecho = 50
 
     # Convertir color de fondo hexadecimal a valores RGB
     color_fondo_rgb = tuple(int(color_fondo[i:i+2], 16) / 255 for i in (1, 3, 5))
