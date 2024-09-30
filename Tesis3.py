@@ -10,6 +10,7 @@ from docx.oxml import OxmlElement
 from flask_sqlalchemy import SQLAlchemy
 from docx2pdf import convert  # Para convertir el archivo .docx a .pdf
 import pythoncom
+import resumen2
 
 
 app = Flask(__name__)
@@ -111,11 +112,33 @@ def upload():
 
         # Obtener los parámetros de adaptación
         nombre_fuente = request.form.get('nombre_fuente')
+        dificultad_aprendizaje = request.form.get('dificultad_aprendizaje') 
         interlineado = int(request.form.get('interlineado', 14))
         size_fuente = int(request.form.get('size_fuente', 12))
         formato_salida = request.form.get('formato_salida', 'pdf')  # pdf o docx
         color_fondo = request.form.get('color_fondo')
 
+        #llamar a la función summary
+        if dificultad_aprendizaje == 'TDAH' or dificultad_aprendizaje == 'Ambas':
+            # Llamar a la función de resumen
+            resumen2.read_file(ruta_archivo)
+        else:
+            # Llamar a la función de adaptación de contenido
+            nombre_archivo_modificado = modificar_documento(
+                ruta_archivo, 
+                nombre_fuente=nombre_fuente, 
+                interlineado=interlineado, 
+                size_fuente=size_fuente,
+                formato_salida=formato_salida, 
+                color_fondo=color_fondo
+            )
+
+            # Verificar si el archivo modificado existe antes de devolverlo
+            if os.path.exists(nombre_archivo_modificado):
+                # Asegurarse de que el archivo que se devuelve mantenga el sufijo _adaptado
+                return send_file(nombre_archivo_modificado, as_attachment=True)
+            else:
+                return 'El archivo adaptado no se encontró', 404
         # Llamar a la función de adaptación de contenido
         nombre_archivo_modificado = modificar_documento(
             ruta_archivo, 

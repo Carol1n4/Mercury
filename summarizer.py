@@ -6,7 +6,8 @@ client = Groq(
     api_key=os.environ.get("GROQ_API_KEY")
 )
 
-with open('input.txt', 'r') as og_file:
+
+with open('Textos.pdf', 'r',  encoding='utf-8') as og_file:
     og = og_file.read()
 
 output = 'PDF' 
