@@ -93,68 +93,64 @@ def upload_file():
 
 @app.route('/upload', methods=['POST', 'GET'])
 def upload():
-    if 'file' not in request.files:
-        return 'No file part'
-    file = request.files['file']
-    if file.filename == '':
-        return 'No selected file'
-    
-    if file:
-        # Obtener el nombre del archivo original y la extensión
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file or file.filename == '':
+            return 'No file part or no selected file'
+        
+        # Guardar el archivo temporalmente
         nombre_original, extension = os.path.splitext(file.filename)
-
-        # Agregar el sufijo "_adaptado" al nombre original
-        nombre_adaptado = nombre_original + extension
-
-        # Guardar el archivo con el nuevo nombre
-        ruta_archivo = os.path.join(tempfile.gettempdir(), nombre_adaptado)
+        ruta_archivo = os.path.join(tempfile.gettempdir(), nombre_original + extension)
         file.save(ruta_archivo)
 
-        # Obtener los parámetros de adaptación
+        dificultad_aprendizaje = request.form.get('dificultad_aprendizaje')
         nombre_fuente = request.form.get('nombre_fuente')
-        dificultad_aprendizaje = request.form.get('dificultad_aprendizaje') 
         interlineado = int(request.form.get('interlineado', 14))
         size_fuente = int(request.form.get('size_fuente', 12))
-        formato_salida = request.form.get('formato_salida', 'pdf')  # pdf o docx
+        formato_salida = request.form.get('formato_salida', 'pdf')
         color_fondo = request.form.get('color_fondo')
 
-        #llamar a la función summary
-        if dificultad_aprendizaje == 'TDAH' or dificultad_aprendizaje == 'Ambas':
-            # Llamar a la función de resumen
-            resumen2.read_file(ruta_archivo)
-        else:
-            # Llamar a la función de adaptación de contenido
-            nombre_archivo_modificado = modificar_documento(
-                ruta_archivo, 
-                nombre_fuente=nombre_fuente, 
-                interlineado=interlineado, 
+        if dificultad_aprendizaje == 'TDAH':
+            # Llamar a la función de resumen de `resumen2.py`
+            resumen_generado = resumen2.generar_resumen(ruta_archivo)
+            if resumen_generado:
+                return send_file(resumen_generado, as_attachment=True, download_name = f"{nombre_original}_tdah.pdf")
+            else:
+                return 'Error al generar el resumen.', 500
+        elif dificultad_aprendizaje == 'dislexia':
+            # Adaptar el archivo para dislexia
+            archivo_adaptado = modificar_documento(
+                ruta_archivo,
+                nombre_fuente=nombre_fuente,
+                interlineado=interlineado,
                 size_fuente=size_fuente,
-                formato_salida=formato_salida, 
+                formato_salida=formato_salida,
                 color_fondo=color_fondo
             )
-
-            # Verificar si el archivo modificado existe antes de devolverlo
-            if os.path.exists(nombre_archivo_modificado):
-                # Asegurarse de que el archivo que se devuelve mantenga el sufijo _adaptado
-                return send_file(nombre_archivo_modificado, as_attachment=True)
+            if archivo_adaptado:
+                return send_file(archivo_adaptado, as_attachment=True)
             else:
-                return 'El archivo adaptado no se encontró', 404
-        # Llamar a la función de adaptación de contenido
-        nombre_archivo_modificado = modificar_documento(
-            ruta_archivo, 
-            nombre_fuente=nombre_fuente, 
-            interlineado=interlineado, 
-            size_fuente=size_fuente,
-            formato_salida=formato_salida, 
-            color_fondo=color_fondo
-        )
+                return 'Error al adaptar el documento.', 500
+        elif dificultad_aprendizaje == 'Ambas':
+            resumen_generado = resumen2.generar_resumen(ruta_archivo)
+            if resumen_generado:
+                # Luego aplicar modificaciones para dislexia al resumen
+                archivo_adaptado = modificar_documento(
+                    resumen_generado,
+                    nombre_fuente=nombre_fuente,
+                    interlineado=interlineado,
+                    size_fuente=size_fuente,
+                    formato_salida=formato_salida,
+                    color_fondo=color_fondo
+                )
+                if archivo_adaptado:
+                    return send_file(archivo_adaptado, as_attachment=True, download_name=f"{nombre_original}_tdah_dislexia.pdf")
+                else:
+                    return 'Error al adaptar el resumen para dislexia.', 500
+            else:
+                return 'Error al generar el resumen.', 500
+    return render_template('upload.html')
 
-        # Verificar si el archivo modificado existe antes de devolverlo
-        if os.path.exists(nombre_archivo_modificado):
-            # Asegurarse de que el archivo que se devuelve mantenga el sufijo _adaptado
-            return send_file(nombre_archivo_modificado, as_attachment=True)
-        else:
-            return 'El archivo adaptado no se encontró', 404
 
 
 
