@@ -10,9 +10,13 @@ from docx.oxml import OxmlElement
 from flask_sqlalchemy import SQLAlchemy
 from docx2pdf import convert  # Para convertir el archivo .docx a .pdf
 import pythoncom
+import resumen2
+from werkzeug.security import generate_password_hash, check_password_hash
+import secrets
 
 
 app = Flask(__name__)
+app.secret_key = secrets.token_hex(16)
 
 # Configuración de la base de datos SQLite
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///usuarios.db'
@@ -35,6 +39,18 @@ class CodigoPermitido(db.Model):
 # Crear la base de datos y las tablas
 with app.app_context():
     db.create_all()
+    
+    # Para agregar un nuevo usuario con contraseña hasheada
+    if not Usuario.query.first():  # Solo añade si no hay usuarios
+        nuevo_usuario = Usuario(
+            email='test@example.com', 
+            password=generate_password_hash('contraseña123'), 
+            codigo='codigo123', 
+            institucion='Instituto de Ejemplo'
+        )
+        db.session.add(nuevo_usuario)
+        db.session.commit()
+
 
 @app.route('/', methods=['GET', 'POST'])
 def registro():
@@ -76,63 +92,76 @@ def login():
 
         if not usuario_existente:
             flash('El usuario no existe.', 'error')
-        elif usuario_existente.password != password:
+        elif not check_password_hash(usuario_existente.password, password):
+
             flash('Contraseña incorrecta.', 'error')
         else:
             flash(f'Bienvenido, {email}!', 'success')
-            return redirect(url_for('upload'))  # Redirigir a la página de upload o donde desees
+            return redirect(url_for('upload'))  
 
     return render_template('login.html')
 
 
-@app.route('/upload', methods=['GET'])
-def upload_file():
-    return render_template('upload.html')
 
-
-@app.route('/upload', methods=['POST', 'GET'])
+@app.route('/upload', methods=['GET', 'POST'])
 def upload():
-    if 'file' not in request.files:
-        return 'No file part'
-    file = request.files['file']
-    if file.filename == '':
-        return 'No selected file'
-    
-    if file:
-        # Obtener el nombre del archivo original y la extensión
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file or file.filename == '':
+            return 'No file part or no selected file'
+        
+        # Guardar el archivo temporalmente
         nombre_original, extension = os.path.splitext(file.filename)
-
-        # Agregar el sufijo "_adaptado" al nombre original
-        nombre_adaptado = nombre_original + extension
-
-        # Guardar el archivo con el nuevo nombre
-        ruta_archivo = os.path.join(tempfile.gettempdir(), nombre_adaptado)
+        ruta_archivo = os.path.join(tempfile.gettempdir(), nombre_original + extension)
         file.save(ruta_archivo)
 
-        # Obtener los parámetros de adaptación
+        dificultad_aprendizaje = request.form.get('dificultad_aprendizaje')
         nombre_fuente = request.form.get('nombre_fuente')
         interlineado = int(request.form.get('interlineado', 14))
         size_fuente = int(request.form.get('size_fuente', 12))
-        formato_salida = request.form.get('formato_salida', 'pdf')  # pdf o docx
+        formato_salida = request.form.get('formato_salida', 'pdf')
         color_fondo = request.form.get('color_fondo')
 
-        # Llamar a la función de adaptación de contenido
-        nombre_archivo_modificado = modificar_documento(
-            ruta_archivo, 
-            nombre_fuente=nombre_fuente, 
-            interlineado=interlineado, 
-            size_fuente=size_fuente,
-            formato_salida=formato_salida, 
-            color_fondo=color_fondo
-        )
-
-        # Verificar si el archivo modificado existe antes de devolverlo
-        if os.path.exists(nombre_archivo_modificado):
-            # Asegurarse de que el archivo que se devuelve mantenga el sufijo _adaptado
-            return send_file(nombre_archivo_modificado, as_attachment=True)
-        else:
-            return 'El archivo adaptado no se encontró', 404
-
+        if dificultad_aprendizaje == 'TDAH':
+            # Llamar a la función de resumen de `resumen2.py`
+            resumen_generado = resumen2.generar_resumen(ruta_archivo)
+            if resumen_generado:
+                return send_file(resumen_generado, as_attachment=True, download_name = f"{nombre_original}_tdah.pdf")
+            else:
+                return 'Error al generar el resumen.', 500
+        elif dificultad_aprendizaje == 'dislexia':
+            # Adaptar el archivo para dislexia
+            archivo_adaptado = modificar_documento(
+                ruta_archivo,
+                nombre_fuente=nombre_fuente,
+                interlineado=interlineado,
+                size_fuente=size_fuente,
+                formato_salida=formato_salida,
+                color_fondo=color_fondo
+            )
+            if archivo_adaptado:
+                return send_file(archivo_adaptado, as_attachment=True)
+            else:
+                return 'Error al adaptar el documento.', 500
+        elif dificultad_aprendizaje == 'Ambas':
+            resumen_generado = resumen2.generar_resumen(ruta_archivo)
+            if resumen_generado:
+                # Luego aplicar modificaciones para dislexia al resumen
+                archivo_adaptado = modificar_documento(
+                    resumen_generado,
+                    nombre_fuente=nombre_fuente,
+                    interlineado=interlineado,
+                    size_fuente=size_fuente,
+                    formato_salida=formato_salida,
+                    color_fondo=color_fondo
+                )
+                if archivo_adaptado:
+                    return send_file(archivo_adaptado, as_attachment=True, download_name=f"{nombre_original}_tdah_dislexia.pdf")
+                else:
+                    return 'Error al adaptar el resumen para dislexia.', 500
+            else:
+                return 'Error al generar el resumen.', 500
+    return render_template('upload.html')
 
 
 def convertir_pdf_a_docx(ruta_pdf, ruta_docx):
@@ -148,9 +177,6 @@ def modificar_pdf(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_
     ancho_a4 = 595
     alto_a4 = 842
     margen_superior = 50
-    margen_inferior = 50
-    margen_izquierdo = 50
-    margen_derecho = 50
 
     # Convertir color de fondo hexadecimal a valores RGB
     color_fondo_rgb = tuple(int(color_fondo[i:i+2], 16) / 255 for i in (1, 3, 5))
