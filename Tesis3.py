@@ -1,7 +1,6 @@
 from flask import Flask, request, redirect, url_for, render_template, send_file, flash
 import os
 import tempfile
-import fitz  # PyMuPDF
 from docx import Document
 from pdf2docx import Converter
 from docx.shared import Pt
@@ -40,18 +39,6 @@ class CodigoPermitido(db.Model):
 with app.app_context():
     db.create_all()
     
-    # Para agregar un nuevo usuario con contraseña hasheada
-    if not Usuario.query.first():  # Solo añade si no hay usuarios
-        nuevo_usuario = Usuario(
-            email='test@example.com', 
-            password=generate_password_hash('contraseña123'), 
-            codigo='codigo123', 
-            institucion='Instituto de Ejemplo'
-        )
-        db.session.add(nuevo_usuario)
-        db.session.commit()
-
-
 @app.route('/', methods=['GET', 'POST'])
 def registro():
     if request.method == 'POST':
@@ -63,12 +50,12 @@ def registro():
         # Comprobar si el usuario ya existe
         usuario_existente = Usuario.query.filter_by(email=email).first()
         if usuario_existente:
-            return "Este correo ya está registrado", 400
+            flash('El correo ya está registrado', 'error')
         
         # Verificar si el código institucional ya está registrado
         codigo_existente = Usuario.query.filter_by(codigo=codigo).first()
-        if codigo_existente:
-            return "Este código institucional ya está registrado", 400
+        if not codigo_existente:
+            flash('El codigo institucional no existe.', 'error')
 
         # Crear un nuevo usuario
         nuevo_usuario = Usuario(email=email, password=password, codigo=codigo, institucion=institucion)
@@ -129,16 +116,10 @@ def upload():
                 return send_file(resumen_generado, as_attachment=True, download_name = f"{nombre_original}_tdah.pdf")
             else:
                 return 'Error al generar el resumen.', 500
-        elif dificultad_aprendizaje == 'dislexia':
+        elif dificultad_aprendizaje == 'Dislexia':
             # Adaptar el archivo para dislexia
-            archivo_adaptado = modificar_documento(
-                ruta_archivo,
-                nombre_fuente=nombre_fuente,
-                interlineado=interlineado,
-                size_fuente=size_fuente,
-                formato_salida=formato_salida,
-                color_fondo=color_fondo
-            )
+            archivo_adaptado = modificar_documento(ruta_archivo, nombre_fuente=nombre_fuente, interlineado=interlineado, 
+                                                   size_fuente=size_fuente, formato_salida=formato_salida, color_fondo=color_fondo)
             if archivo_adaptado:
                 return send_file(archivo_adaptado, as_attachment=True)
             else:
@@ -147,14 +128,8 @@ def upload():
             resumen_generado = resumen2.generar_resumen(ruta_archivo)
             if resumen_generado:
                 # Luego aplicar modificaciones para dislexia al resumen
-                archivo_adaptado = modificar_documento(
-                    resumen_generado,
-                    nombre_fuente=nombre_fuente,
-                    interlineado=interlineado,
-                    size_fuente=size_fuente,
-                    formato_salida=formato_salida,
-                    color_fondo=color_fondo
-                )
+                archivo_adaptado = modificar_documento(resumen_generado, nombre_fuente=nombre_fuente, interlineado=interlineado, 
+                                                    size_fuente=size_fuente,formato_salida=formato_salida, color_fondo=color_fondo)
                 if archivo_adaptado:
                     return send_file(archivo_adaptado, as_attachment=True, download_name=f"{nombre_original}_tdah_dislexia.pdf")
                 else:
@@ -169,53 +144,6 @@ def convertir_pdf_a_docx(ruta_pdf, ruta_docx):
     cv.convert(ruta_docx, start=0, end=None)
     cv.close()
 
-def modificar_pdf(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo): 
-    doc = fitz.open(ruta_archivo)
-    nuevo_doc = fitz.open()
-
-    # Tamaño de una página A4
-    ancho_a4 = 595
-    alto_a4 = 842
-    margen_superior = 50
-    margen_inferior = 50  # Definir margen inferior
-    
-    # Convertir color de fondo hexadecimal a valores RGB
-    color_fondo_rgb = tuple(int(color_fondo[i:i+2], 16) / 255 for i in (1, 3, 5))
-
-    for pagina in doc:
-        # Crear la primera página en el nuevo documento
-        nueva_pagina = nuevo_doc.new_page(width=ancho_a4, height=alto_a4)
-        nueva_pagina.draw_rect(fitz.Rect(0, 0, ancho_a4, alto_a4), color=color_fondo_rgb, fill=color_fondo_rgb)
-
-        y_offset = margen_superior  # Posición inicial (margen superior)
-        for bloque in pagina.get_text("dict")["blocks"]:
-            if "lines" in bloque:
-                for linea in bloque["lines"]:
-                    for span in linea["spans"]:
-                        texto = span["text"]
-                        x, y = span["bbox"][:2]
-                        
-                        # Verificar si el texto cabe en la página actual (sin pasarse del margen inferior)
-                        if y_offset + size_fuente * interlineado > alto_a4 - margen_inferior:
-                            # Crear una nueva página si llegamos al margen inferior
-                            nueva_pagina = nuevo_doc.new_page(width=ancho_a4, height=alto_a4)
-                            nueva_pagina.draw_rect(fitz.Rect(0, 0, ancho_a4, alto_a4), color=color_fondo_rgb, fill=color_fondo_rgb)
-                            y_offset = margen_superior  # Reiniciar el y_offset al margen superior de la nueva página
-                        
-                        # Insertar texto en la posición actual sin modificar el margen superior
-                        nueva_pagina.insert_text((x, y_offset), texto, fontname=nombre_fuente, fontsize=size_fuente, color=(0, 0, 0))
-                        
-                    # Incrementar el y_offset en función del interlineado
-                    y_offset += size_fuente * interlineado
-                
-                # Espacio adicional entre bloques de texto (opcional)
-                y_offset += size_fuente * 0.5
-
-    # Guardar el nuevo documento
-    nuevo_doc.save("pdf_modificado.pdf")
-    nuevo_doc.close()
-
-
 def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo):
     pythoncom.CoInitialize()  # Inicializa el sistema COM
     try:
@@ -226,6 +154,9 @@ def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color
         bg = OxmlElement('w:background')
         bg.set(qn('w:color'), color_fondo[1:])  # Eliminamos el símbolo '#' para obtener el color HEX puro
         sectPr.append(bg)
+
+        for section in doc.sections:
+            section.top_margin = Pt(72)
 
         for parrafo in doc.paragraphs:
             for run in parrafo.runs:
