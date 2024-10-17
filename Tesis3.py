@@ -169,37 +169,51 @@ def convertir_pdf_a_docx(ruta_pdf, ruta_docx):
     cv.convert(ruta_docx, start=0, end=None)
     cv.close()
 
-
-def modificar_pdf(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo):
+def modificar_pdf(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo): 
     doc = fitz.open(ruta_archivo)
     nuevo_doc = fitz.open()
 
+    # Tamaño de una página A4
     ancho_a4 = 595
     alto_a4 = 842
     margen_superior = 50
-
+    margen_inferior = 50  # Definir margen inferior
+    
     # Convertir color de fondo hexadecimal a valores RGB
     color_fondo_rgb = tuple(int(color_fondo[i:i+2], 16) / 255 for i in (1, 3, 5))
 
     for pagina in doc:
+        # Crear la primera página en el nuevo documento
         nueva_pagina = nuevo_doc.new_page(width=ancho_a4, height=alto_a4)
         nueva_pagina.draw_rect(fitz.Rect(0, 0, ancho_a4, alto_a4), color=color_fondo_rgb, fill=color_fondo_rgb)
 
-        y_offset = margen_superior
+        y_offset = margen_superior  # Posición inicial (margen superior)
         for bloque in pagina.get_text("dict")["blocks"]:
             if "lines" in bloque:
                 for linea in bloque["lines"]:
                     for span in linea["spans"]:
                         texto = span["text"]
                         x, y = span["bbox"][:2]
+                        
+                        # Verificar si el texto cabe en la página actual (sin pasarse del margen inferior)
+                        if y_offset + size_fuente * interlineado > alto_a4 - margen_inferior:
+                            # Crear una nueva página si llegamos al margen inferior
+                            nueva_pagina = nuevo_doc.new_page(width=ancho_a4, height=alto_a4)
+                            nueva_pagina.draw_rect(fitz.Rect(0, 0, ancho_a4, alto_a4), color=color_fondo_rgb, fill=color_fondo_rgb)
+                            y_offset = margen_superior  # Reiniciar el y_offset al margen superior de la nueva página
+                        
+                        # Insertar texto en la posición actual sin modificar el margen superior
                         nueva_pagina.insert_text((x, y_offset), texto, fontname=nombre_fuente, fontsize=size_fuente, color=(0, 0, 0))
-                    y_offset += size_fuente * 1.8
+                        
+                    # Incrementar el y_offset en función del interlineado
+                    y_offset += size_fuente * interlineado
+                
+                # Espacio adicional entre bloques de texto (opcional)
                 y_offset += size_fuente * 0.5
 
-    nombre_archivo_modificado = os.path.splitext(ruta_archivo)[0] + "_Adaptado.pdf"
-    nuevo_doc.save(nombre_archivo_modificado)
+    # Guardar el nuevo documento
+    nuevo_doc.save("pdf_modificado.pdf")
     nuevo_doc.close()
-    return nombre_archivo_modificado
 
 
 def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo):
