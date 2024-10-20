@@ -5,9 +5,10 @@ Intentar tener un MVP funcionando.
 
 Cosas por hacer a nivel codigo
 
-- [ ] Arreglar salto de página en pdf
-- [ ] Borde blanco a la derecha (dislexia)
-- [ ] Sacar texto LLM (TDAH/Ambas)
+- [x] Arreglar salto de página en pdf
+- [ ] Arreglar frase rara
+- [x] Borde blanco a la derecha (dislexia)
+- [x] Sacar texto LLM (TDAH/Ambas)
 - [ ] Opción que devuelva Word (TDAH/Ambas)
 - [ ] Justificar texto
 - [ ] Armar backend para registro de usuarios
