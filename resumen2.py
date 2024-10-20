@@ -22,6 +22,23 @@ def clean_text(text):
     # Elimina caracteres no imprimibles
     return re.sub(r'[^\x20-\x7E]+', '', text)
 
+
+def clean_summary(summary):
+    # Definir las expresiones regulares por separado
+    #resumen_pattern = r'resumen del.*:'
+    heres_pattern = r"here's.*:"
+    here_is_pattern = r'here is.*:'
+    #aqui_pattern = r'aquí tienes.*'
+
+    # Combinar las expresiones con "|"
+    combined_pattern = r'(?i)(' + heres_pattern + r'|' + here_is_pattern + r')'
+
+    # Eliminar cualquier coincidencia en el resumen
+    summary = re.sub(combined_pattern, '', summary).strip()
+
+    return summary
+
+
 def read_file(file_path):
     file_extension = os.path.splitext(file_path)[1].lower()
     text = ""
@@ -85,7 +102,7 @@ def generar_resumen(file_path):
                 model="llama3-70b-8192",
                 messages=[{
                     "role": "user",
-                    "content": "Por favor, resume el siguiente texto para estudiantes con TDAH. El resumen debe: \n\n1. Ser más corto y simple, usando un lenguaje claro y directo. \n\n2. Mantener el significado original y los detalles importantes. \n\n3. Conservar el mismo punto de vista y tono que el texto original. \n\n4. Mantener el orden de la información. \n\n No utilices viñetas ni encabezados. \n\n Aquí está el texto:\n\n" + og
+                    "content": "Por favor, resume el siguiente texto para estudiantes con TDAH, sin añadir frases introductorias. El resumen debe: \n\n1. Ser más corto y simple, usando un lenguaje claro y directo. \n\n2. Mantener el significado original y los detalles importantes. \n\n3. Conservar el mismo punto de vista y tono que el texto original. \n\n4. Mantener el orden de la información. \n\n 5. Conservar datos numéricos o de fechas relevantes. \n\n No utilices viñetas ni encabezados.  \n\n Aquí está el texto:\n\n" + og
                 }],
                 temperature=1,
                 max_tokens=1024,
@@ -99,7 +116,9 @@ def generar_resumen(file_path):
                 print("Error: El resumen generado está vacío.")
                 return None
 
-            print(f"Resumen generado: \n{text_content}")
+            # Limpiar las frases introductorias del resumen
+            text_content = clean_summary(text_content)
+            print(f"Resumen generado y limpio: \n{text_content}")
 
             # Crear un archivo temporal para el PDF
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
@@ -110,8 +129,7 @@ def generar_resumen(file_path):
             c.setFont("Helvetica", 12)  # Establecer la fuente y tamaño
             y = PAGE_HEIGHT - 50  # Posición inicial en el eje Y
 
-            # Agregar el título al PDF
-            c.drawString(MARGIN_LEFT, y, "Resumen del texto:")
+        
             y -= 20  # Espacio después del título
 
             # Agregar el contenido del resumen al PDF
