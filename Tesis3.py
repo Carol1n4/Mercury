@@ -3,7 +3,7 @@ import os
 import tempfile
 from docx import Document
 from pdf2docx import Converter
-from docx.shared import Pt
+from docx.shared import Pt, Inches
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from flask_sqlalchemy import SQLAlchemy
@@ -12,7 +12,8 @@ import pythoncom
 import resumen2
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
-
+from docx.enum.text import WD_ALIGN_PARAGRAPH 
+from docx.shared import Mm
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
@@ -51,17 +52,19 @@ def registro():
         usuario_existente = Usuario.query.filter_by(email=email).first()
         if usuario_existente:
             flash('El correo ya está registrado', 'error')
+            return redirect(url_for('registro'))
         
         # Verificar si el código institucional ya está registrado
-        codigo_existente = Usuario.query.filter_by(codigo=codigo).first()
-        if not codigo_existente:
-            flash('El codigo institucional no existe.', 'error')
+        codigo_permitido = CodigoPermitido.query.filter_by(codigo=codigo).first()
+        if not codigo_permitido:
+            flash('El código institucional no es válido.', 'error')
+            return redirect(url_for('registro'))  # Asegúrate de no permitir la creación de usuarios con códigos no válidos
 
         # Crear un nuevo usuario
-        nuevo_usuario = Usuario(email=email, password=password, codigo=codigo, institucion=institucion)
+        hashed_password = generate_password_hash(password)
+        nuevo_usuario = Usuario(email=email, password=hashed_password, codigo=codigo, institucion=institucion)
         db.session.add(nuevo_usuario)
         db.session.commit()
-
         return redirect(url_for('login'))  # Redirigir al login tras registrarse
 
     return render_template('registro.html')
@@ -79,9 +82,10 @@ def login():
 
         if not usuario_existente:
             flash('El usuario no existe.', 'error')
+        
         elif not check_password_hash(usuario_existente.password, password):
-
             flash('Contraseña incorrecta.', 'error')
+        
         else:
             flash(f'Bienvenido, {email}!', 'success')
             return redirect(url_for('upload'))  
@@ -156,9 +160,15 @@ def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color
         sectPr.append(bg)
 
         for section in doc.sections:
-            section.top_margin = Pt(72)
+            section.page_width = Mm(210)  # A4 width en milímetros
+            section.page_height = Mm(297)  # A4 height en milímetros
+            section.top_margin = Pt(72)  # Ajusta el margen superior
+            section.bottom_margin = Inches(0.5)  # Ajusta el margen inferior
+            section.left_margin = Inches(0.8)  # Ajusta el margen izquierdo
+            section.right_margin = Inches(0.8)  # Ajusta el margen derecho
 
         for parrafo in doc.paragraphs:
+            parrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             for run in parrafo.runs:
                 run.font.name = nombre_fuente
                 run.font.size = Pt(size_fuente)
@@ -179,26 +189,21 @@ def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color
 def modificar_documento(ruta_archivo, nombre_fuente, size_fuente, interlineado, formato_salida, color_fondo):
     pythoncom.CoInitialize()  # Inicializa el sistema COM
     try:
-        if formato_salida == "pdf":
-            # No se añade sufijo extra aquí
-            ruta_docx_temp = os.path.splitext(ruta_archivo)[0] + ".docx"
-            convertir_pdf_a_docx(ruta_archivo, ruta_docx_temp)
-            archivo_docx = modificar_word(ruta_docx_temp, nombre_fuente, interlineado, size_fuente, color_fondo)
-
-            # Convertir el archivo Word a PDF
-            archivo_pdf_final = os.path.splitext(ruta_archivo)[0] + "_adaptado.pdf"  # Sufijo solo aquí
-            convert(archivo_docx, archivo_pdf_final)
-
-            return archivo_pdf_final
-
-        elif formato_salida == "docx":
-            if ruta_archivo.endswith('.pdf'):
+        if ruta_archivo.endswith('.pdf'):
                 ruta_docx_temp = os.path.splitext(ruta_archivo)[0] + ".docx"
                 convertir_pdf_a_docx(ruta_archivo, ruta_docx_temp)
-                return modificar_word(ruta_docx_temp, nombre_fuente, interlineado, size_fuente, color_fondo)
-            else:
-                # Sufijo _adaptado solo aquí
-                return modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo)
+                archivo_docx = modificar_word(ruta_docx_temp, nombre_fuente, interlineado, size_fuente, color_fondo)
+
+        archivo_docx = modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo)
+
+        if formato_salida == "pdf":
+            # Convertir el archivo Word a PDF
+            archivo_pdf_final = os.path.splitext(ruta_archivo)[0] + "_adaptado.pdf" 
+            convert(archivo_docx, archivo_pdf_final)
+            return archivo_pdf_final
+        else:
+            return archivo_docx
+
     finally:
         pythoncom.CoUninitialize()  # Desinicializa COM
 
