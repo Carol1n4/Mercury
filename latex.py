@@ -1,3 +1,10 @@
+import re
+import pythoncom
+from docx import Document
+from docx.shared import Pt, Inches, Mm
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from flask import Flask, request, redirect, url_for, render_template, send_file, flash
 import os
 import tempfile
@@ -122,7 +129,7 @@ def upload():
                 return 'Error al generar el resumen.', 500
         elif dificultad_aprendizaje == 'Dislexia':
             # Adaptar el archivo para dislexia
-            archivo_adaptado = modificar_documento(ruta_archivo, nombre_fuente=nombre_fuente, interlineado=interlineado, 
+            archivo_adaptado = modificar_word(ruta_archivo, nombre_fuente=nombre_fuente, interlineado=interlineado, 
                                                    size_fuente=size_fuente, formato_salida=formato_salida, color_fondo=color_fondo)
             if archivo_adaptado:
                 return send_file(archivo_adaptado, as_attachment=True)
@@ -132,7 +139,7 @@ def upload():
             resumen_generado = resumen2.generar_resumen(ruta_archivo)
             if resumen_generado:
                 # Luego aplicar modificaciones para dislexia al resumen
-                archivo_adaptado = modificar_documento(resumen_generado, nombre_fuente=nombre_fuente, interlineado=interlineado, 
+                archivo_adaptado = modificar_word(resumen_generado, nombre_fuente=nombre_fuente, interlineado=interlineado, 
                                                     size_fuente=size_fuente,formato_salida=formato_salida, color_fondo=color_fondo)
                 if archivo_adaptado:
                     return send_file(archivo_adaptado, as_attachment=True, download_name=f"{nombre_original}_tdah_dislexia.pdf")
@@ -147,6 +154,72 @@ def convertir_pdf_a_docx(ruta_pdf, ruta_docx):
     cv = Converter(ruta_pdf)
     cv.convert(ruta_docx, start=0, end=None)
     cv.close()
+
+def detectar_latex(texto):
+    """
+    Función para detectar y separar secciones de LaTeX del resto del texto.
+    
+    :param texto: Cadena de texto con posibles fórmulas LaTeX.
+    :return: Lista de tuplas con el tipo de segmento (latex o texto) y el contenido.
+    """
+    # Patrón regex para encontrar secciones de LaTeX en $...$, \[...\], \begin{...}...\end{...}
+    patron_latex = re.compile(
+        r'(\$.*?\$)'                       # Expresiones matemáticas en $...$
+        r'|(\$\$.*?\$\$)'                 # Expresiones matemáticas en $$...$$
+        r'|\\\[(.*?)\\\]'                 # Expresiones matemáticas en \[...\]
+        r'|\\begin\{.*?\}(.*?)\\end\{.*?\}'  # Entornos \begin{...}...\end{...}
+        , re.DOTALL
+    )
+    
+    segmentos = []
+    ultimo_indice = 0
+
+    # Buscar coincidencias de LaTeX en el texto
+    for coincidencia in patron_latex.finditer(texto):
+        inicio, fin = coincidencia.span()
+
+        # Agregar texto normal antes de la coincidencia
+        if inicio > ultimo_indice:
+            segmentos.append(("texto", texto[ultimo_indice:inicio]))
+
+        # Agregar la coincidencia de LaTeX
+        segmentos.append(("latex", texto[inicio:fin]))
+        ultimo_indice = fin
+
+    # Agregar cualquier texto restante
+    if ultimo_indice < len(texto):
+        segmentos.append(("texto", texto[ultimo_indice:]))
+
+    return segmentos
+
+def adaptar_texto(texto, nombre_fuente, interlineado, size_fuente):
+    """
+    Aplica adaptaciones específicas de dislexia y TDAH a un texto.
+    """
+    # Aquí podrías personalizar la lógica de adaptación de texto para dislexia o TDAH.
+    # Por ejemplo, aumentar la fuente, cambiar la fuente, etc.
+    # Este es un ejemplo simple de cambio de fuente y tamaño.
+    return texto.upper()  # Ejemplo básico
+
+def aplicar_adaptaciones(parrafo, nombre_fuente, interlineado, size_fuente):
+    """
+    Función para aplicar adaptaciones a los segmentos que no son LaTeX.
+    
+    :param parrafo: Objeto Paragraph en el que se aplica la adaptación.
+    """
+    segmentos = detectar_latex(parrafo.text)
+    
+    nuevo_contenido = ""
+    
+    for tipo, contenido in segmentos:
+        if tipo == "latex":
+            nuevo_contenido += contenido  # Mantener LaTeX intacto
+        else:
+            nuevo_contenido += adaptar_texto(contenido, nombre_fuente, interlineado, size_fuente)
+    
+    # Borrar el texto existente y reemplazarlo por el nuevo contenido
+    parrafo.clear()
+    parrafo.add_run(nuevo_contenido)
 
 def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo):
     pythoncom.CoInitialize()  # Inicializa el sistema COM
@@ -169,10 +242,7 @@ def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color
 
         for parrafo in doc.paragraphs:
             parrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            parrafo.paragraph_format.space_after = Pt(3)
-            for run in parrafo.runs:
-                run.font.name = nombre_fuente
-                run.font.size = Pt(size_fuente)
+            aplicar_adaptaciones(parrafo, nombre_fuente, interlineado, size_fuente)
 
             p = parrafo._element
             pPr = p.get_or_add_pPr()
@@ -185,28 +255,3 @@ def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color
         return nombre_archivo_modificado
     finally:
         pythoncom.CoUninitialize()  # Desinicializa COM
-
-
-def modificar_documento(ruta_archivo, nombre_fuente, size_fuente, interlineado, formato_salida, color_fondo):
-    pythoncom.CoInitialize()  # Inicializa el sistema COM
-    try:
-        if ruta_archivo.endswith('.pdf'):
-                ruta_docx_temp = os.path.splitext(ruta_archivo)[0] + ".docx"
-                convertir_pdf_a_docx(ruta_archivo, ruta_docx_temp)
-                archivo_docx = modificar_word(ruta_docx_temp, nombre_fuente, interlineado, size_fuente, color_fondo)
-        else:
-            archivo_docx = modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo)
-
-        if formato_salida == "pdf":
-            # Convertir el archivo Word a PDF
-            archivo_pdf_final = os.path.splitext(ruta_archivo)[0] + "_adaptado.pdf" 
-            convert(archivo_docx, archivo_pdf_final)
-            return archivo_pdf_final
-        else:
-            return archivo_docx
-
-    finally:
-        pythoncom.CoUninitialize()  # Desinicializa COM
-
-if __name__ == '__main__':
-    app.run(debug=True)
