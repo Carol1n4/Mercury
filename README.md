@@ -6,14 +6,14 @@ Intentar tener un MVP funcionando.
 Cosas por hacer a nivel codigo
 
 - [x] Arreglar salto de página en pdf
-- [ ] Arreglar márgenes en word
+- [X] Arreglar márgenes en word
 - [ ] Fondo de color en word
 - [ ] Arreglar frase rara
 - [x] Borde blanco a la derecha (dislexia)
 - [x] Sacar texto LLM (TDAH/Ambas)
 - [x] Opción que devuelva Word (TDAH/Ambas)
 - [ ] LaTeX
-- [ ] Justificar texto
+- [X] Justificar texto
 - [ ] Armar backend para registro de usuarios
 
 ~~Descargar archivos con las fuentes que pusimos de opcion en el html //LISTO~~
