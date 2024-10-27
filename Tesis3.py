@@ -117,9 +117,15 @@ def upload():
             # Llamar a la función de resumen de `resumen2.py`
             resumen_generado = resumen2.generar_resumen(ruta_archivo)
             if resumen_generado:
-                return send_file(resumen_generado, as_attachment=True, download_name = f"{nombre_original}_tdah.pdf")
+                if formato_salida == "pdf":
+                    return send_file(resumen_generado, as_attachment=True, download_name = f"{nombre_original}_tdah.pdf")
+                elif formato_salida == "docx":
+                    ruta_docx_temp = os.path.splitext(ruta_archivo)[0] + ".docx"
+                    convertir_pdf_a_docx(resumen_generado, ruta_docx_temp)
+                    return send_file(ruta_docx_temp, as_attachment=True, download_name = f"{nombre_original}_tdah.docx")
             else:
                 return 'Error al generar el resumen.', 500
+
         elif dificultad_aprendizaje == 'Dislexia':
             # Adaptar el archivo para dislexia
             archivo_adaptado = modificar_documento(ruta_archivo, nombre_fuente=nombre_fuente, interlineado=interlineado, 
@@ -128,6 +134,7 @@ def upload():
                 return send_file(archivo_adaptado, as_attachment=True)
             else:
                 return 'Error al adaptar el documento.', 500
+
         elif dificultad_aprendizaje == 'Ambas':
             resumen_generado = resumen2.generar_resumen(ruta_archivo)
             if resumen_generado:
@@ -135,7 +142,8 @@ def upload():
                 archivo_adaptado = modificar_documento(resumen_generado, nombre_fuente=nombre_fuente, interlineado=interlineado, 
                                                     size_fuente=size_fuente,formato_salida=formato_salida, color_fondo=color_fondo)
                 if archivo_adaptado:
-                    return send_file(archivo_adaptado, as_attachment=True, download_name=f"{nombre_original}_tdah_dislexia.pdf")
+                    extension = 'pdf' if formato_salida == 'pdf' else 'docx'
+                    return send_file(archivo_adaptado, as_attachment=True, download_name=f"{nombre_original}_tdah_dislexia.{extension}")
                 else:
                     return 'Error al adaptar el resumen para dislexia.', 500
             else:
