@@ -155,6 +155,11 @@ def convertir_pdf_a_docx(ruta_pdf, ruta_docx):
     cv = Converter(ruta_pdf)
     cv.convert(ruta_docx, start=0, end=None)
     cv.close()
+    
+def detectar_latex(texto):
+    # Expresión regular para detectar texto LaTeX
+    latex_regex = r"(\$.*?\$|\\\(.*?\\\)|\\\[.*?\\\])"
+    return re.findall(latex_regex, texto)
 
 def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color_fondo):
     pythoncom.CoInitialize()  # Inicializa el sistema COM
@@ -178,9 +183,13 @@ def modificar_word(ruta_archivo, nombre_fuente, interlineado, size_fuente, color
         for parrafo in doc.paragraphs:
             parrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             parrafo.paragraph_format.space_after = Pt(3)
+            latex_parts = detectar_latex(parrafo.text)
             for run in parrafo.runs:
-                run.font.name = nombre_fuente
-                run.font.size = Pt(size_fuente)
+                if any(latex in run.text for latex in latex_parts):
+                        continue
+                if run.text.strip(): #chequea que sea texto
+                    run.font.name = nombre_fuente
+                    run.font.size = Pt(size_fuente)
 
             p = parrafo._element
             pPr = p.get_or_add_pPr()
