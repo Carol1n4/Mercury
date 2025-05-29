@@ -1,5 +1,5 @@
 # Mercury
-Mercury the best
+
 
 Intentar tener un MVP funcionando.
 
